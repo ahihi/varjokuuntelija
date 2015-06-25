@@ -29,10 +29,23 @@ fn str_ptr(s: &str) -> *const i8 {
 }
 
 fn main() {
-    let window = glutin::Window::new().unwrap();
+    // Get the first available monitor
+    let monitor = glutin::get_available_monitors().nth(0).unwrap();    
+    
+    // Construct a window
+    let wb = glutin::WindowBuilder::new()
+             .with_title("glmoi".to_string())
+             .with_dimensions(1280, 720)
+             //.with_fullscreen(monitor)
+             //.with_vsync()
+             ;
+    let window = wb.build().unwrap();
+    
+    // Initialize GL
     let _ = unsafe { window.make_current() };
     gl::load_with(|symbol| window.get_proc_address(symbol));
     
+    // Compile and link shaders
     let vs = Shader::new(VS_SRC, gl::VERTEX_SHADER);
     let fs = Shader::new(FS_SRC, gl::FRAGMENT_SHADER);
     let program = Program::new(&vs, &fs);
