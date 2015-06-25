@@ -3,6 +3,14 @@ name = "glmoi"
 version = "0.1.0"
 authors = ["Miranda Kastemaa <miranda@foldplop.com>", "Nils Haglund <shiensha@gmail.com>"]
 
+[lib]
+name = "glmoi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "glmoi"
+path = "src/main.rs"
+
 [dependencies]
 glutin = "0.2"
 libc = "0.1"
