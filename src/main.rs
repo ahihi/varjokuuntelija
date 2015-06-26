@@ -32,6 +32,14 @@ fn str_ptr(s: &str) -> *const i8 {
     CString::new(s).unwrap().as_ptr()
 }
 
+fn gl_version() -> (GLint, GLint) {
+    let mut major: GLint = -1;
+    unsafe { gl::GetIntegerv(gl::MAJOR_VERSION, &mut major) };
+    let mut minor: GLint = -1;
+    unsafe { gl::GetIntegerv(gl::MINOR_VERSION, &mut minor) };
+    (major, minor)
+}
+
 fn main() {
     // Get the first available monitor
     let _monitor = glutin::get_available_monitors().nth(0).unwrap();
@@ -42,6 +50,8 @@ fn main() {
              .with_dimensions(1280, 720)
              //.with_fullscreen(_monitor)
              .with_vsync()
+             .with_gl(glutin::GlRequest::Latest)
+             .with_gl_profile(glutin::GlProfile::Core)
              ;
     let window = wb.build().unwrap();
     let _ = unsafe { window.make_current() };
@@ -49,6 +59,9 @@ fn main() {
     
     // Initialize GL
     gl::load_with(|symbol| window.get_proc_address(symbol));
+    
+    let (major, minor) = gl_version();
+    println!("OpenGL version: {}.{}", major, minor);
     
     // Compile and link shaders
     let vs = Shader::new(VS_SRC, gl::VERTEX_SHADER);
