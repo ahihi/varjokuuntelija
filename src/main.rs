@@ -41,12 +41,13 @@ fn main() {
              .with_title("glmoi".to_string())
              .with_dimensions(1280, 720)
              //.with_fullscreen(_monitor)
-             //.with_vsync()
+             .with_vsync()
              ;
     let window = wb.build().unwrap();
+    let _ = unsafe { window.make_current() };
+    let _ = window.set_cursor_state(glutin::CursorState::Hide);
     
     // Initialize GL
-    let _ = unsafe { window.make_current() };
     gl::load_with(|symbol| window.get_proc_address(symbol));
     
     // Compile and link shaders
