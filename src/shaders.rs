@@ -1,5 +1,4 @@
 extern crate gl;
-//extern crate libc;
 
 use self::gl::types::*;
 use std::ptr;
@@ -8,7 +7,7 @@ use std::ffi::CString;
 
 pub struct Shader {
     pub id: GLuint,
-    kind: GLenum
+    pub kind: GLenum
 }
 
 impl Shader {
@@ -51,8 +50,8 @@ impl Drop for Shader {
 
 pub struct Program<'a> {
     pub id: GLuint,
-    vertex_shader: &'a Shader,
-    fragment_shader: &'a Shader
+    pub vertex_shader: &'a Shader,
+    pub fragment_shader: &'a Shader
 }
 
 impl<'a> Program<'a> {

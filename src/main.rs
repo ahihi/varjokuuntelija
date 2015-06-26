@@ -1,7 +1,7 @@
 extern crate gl;
-extern crate glmoi;
 extern crate glutin;
-extern crate libc;
+
+extern crate glmoi;
 
 use gl::types::*;
 use glutin::ElementState::*;
