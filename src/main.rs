@@ -4,9 +4,13 @@ extern crate glutin;
 extern crate libc;
 
 use gl::types::*;
+use glutin::ElementState::*;
+use glutin::Event::*;
+use glutin::VirtualKeyCode::*;
 use std::mem;
 use std::ptr;
 use std::ffi::CString;
+
 use glmoi::shaders::{Program, Shader};
 
 static VS_SRC: &'static str =
@@ -30,13 +34,13 @@ fn str_ptr(s: &str) -> *const i8 {
 
 fn main() {
     // Get the first available monitor
-    let monitor = glutin::get_available_monitors().nth(0).unwrap();    
+    let _monitor = glutin::get_available_monitors().nth(0).unwrap();
     
     // Construct a window
     let wb = glutin::WindowBuilder::new()
              .with_title("glmoi".to_string())
              .with_dimensions(1280, 720)
-             //.with_fullscreen(monitor)
+             //.with_fullscreen(_monitor)
              //.with_vsync()
              ;
     let window = wb.build().unwrap();
@@ -105,9 +109,12 @@ fn main() {
         let _ = window.swap_buffers();
 
         match event {
-            glutin::Event::Closed => break,
-            glutin::Event::KeyboardInput(glutin::ElementState::Pressed, _, Some(glutin::VirtualKeyCode::Escape)) => break,
-            _ => println!("{:?}", event)
+            Closed
+                => break,
+            KeyboardInput(Pressed, _, Some(Escape))
+                => break,
+            _
+                => println!("{:?}", event)
         }
     }
 }
