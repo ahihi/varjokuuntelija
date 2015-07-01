@@ -1,5 +1,6 @@
 extern crate gl;
 extern crate glutin;
+extern crate portaudio;
 
 extern crate glmoi;
 
@@ -7,6 +8,7 @@ use gl::types::*;
 use glutin::ElementState::*;
 use glutin::Event::*;
 use glutin::VirtualKeyCode::*;
+use portaudio::pa;
 use std::mem;
 use std::ptr;
 use std::ffi::CString;
@@ -42,9 +44,15 @@ fn gl_version() -> (GLint, GLint) {
 
 fn main() {
     // Set up audio
-    /*let audio = AO::init();
-    let driver = audio.get_driver("").unwrap();
-    println!("AO driver info: {:?}", driver.get_info());*/
+    pa::initialize().unwrap();
+    let default_host = pa::host::get_default_api();
+    println!("PA host: {}", default_host);
+    let api_info = pa::host::get_api_info(default_host);
+    let api_info_str = match api_info {
+        None       => "N/A".to_string(),
+        Some(info) => info.name,
+    };
+    println!("PA API info: {}", api_info_str);
     
     // Get the first available monitor
     let _monitor = glutin::get_available_monitors().nth(0).unwrap();
