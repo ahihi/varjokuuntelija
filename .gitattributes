@@ -4,5 +4,7 @@ bin/jackmon text
 *.rs text
 *.toml text
 *.md text
+*.frag text
+*.vert text
 
 *.png binary
