@@ -15,20 +15,8 @@ use std::ffi::CString;
 
 use glmoi::shaders::{Program, Shader};
 
-static VS_SRC: &'static str =
-   "#version 150\n\
-    in vec3 position;\n\
-    void main() {\n\
-       gl_Position = vec4(position, 1.0);\n\
-    }";
-
-static FS_SRC: &'static str =
-   "#version 150\n\
-    uniform vec2 u_resolution;\n\
-    out vec4 out_color;\n\
-    void main() {\n\
-       out_color = vec4(gl_FragCoord.x/u_resolution.x, 0.0, gl_FragCoord.y/u_resolution.y, 1.0);\n\
-    }";
+static VS_SRC: &'static str = include_str!("glsl/default.vert");
+static FS_SRC: &'static str = include_str!("glsl/default.frag");
 
 fn str_ptr(s: &str) -> *const i8 {
     CString::new(s).unwrap().as_ptr()
