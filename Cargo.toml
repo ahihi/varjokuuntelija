@@ -8,7 +8,7 @@ name = "glmoi"
 path = "src/lib.rs"
 
 [[bin]]
-name = "glmoi"
+name = "glmoi-demo"
 path = "src/main.rs"
 
 [dependencies]
