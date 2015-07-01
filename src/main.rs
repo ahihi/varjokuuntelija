@@ -1,10 +1,8 @@
-extern crate ao;
 extern crate gl;
 extern crate glutin;
 
 extern crate glmoi;
 
-use ao::AO;
 use gl::types::*;
 use glutin::ElementState::*;
 use glutin::Event::*;
@@ -44,9 +42,9 @@ fn gl_version() -> (GLint, GLint) {
 
 fn main() {
     // Set up audio
-    let audio = AO::init();
+    /*let audio = AO::init();
     let driver = audio.get_driver("").unwrap();
-    println!("AO driver info: {:?}", driver.get_info());
+    println!("AO driver info: {:?}", driver.get_info());*/
     
     // Get the first available monitor
     let _monitor = glutin::get_available_monitors().nth(0).unwrap();
