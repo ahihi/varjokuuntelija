@@ -20,3 +20,6 @@ git = "https://github.com/bjz/gl-rs"
 
 [dependencies.portaudio]
 git = "https://github.com/ahihi/rust-portaudio"
+
+[dependencies.demonplayer]
+git = "https://github.com/ahihi/demonplayer.git"

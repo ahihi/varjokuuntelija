@@ -1,15 +1,16 @@
+extern crate demonplayer;
 extern crate gl;
 extern crate glutin;
-extern crate portaudio;
 
 extern crate glmoi;
 
+use demonplayer::Demonplayer;
 use gl::types::*;
 use glutin::ElementState::*;
 use glutin::Event::*;
 use glutin::VirtualKeyCode::*;
-use portaudio::pa;
 use std::mem;
+use std::path::Path;
 use std::ptr;
 use std::ffi::CString;
 
@@ -32,19 +33,34 @@ fn gl_version() -> (GLint, GLint) {
 
 fn main() {
     // Set up audio
-    pa::initialize().unwrap();
-    let default_host = pa::host::get_default_api();
+    let player = Demonplayer::from_flac(Path::new("music.flac"))
+                 .unwrap_or_else(|e| {
+                     panic!("demonplayer init failed: {:?}", e);
+                 });
+
+    println!("");
+    println!("Sample rate: {}", player.sample_rate());
+    println!("Bit depth: {}", player.bit_depth());
+    println!("Channels: {}", player.channels());
+    println!("Samples: {}", player.n_samples());
+    println!("Duration: {} s", player.duration());
+
+    println!("");
+    println!("Playing");
+    let _ = player.play();
+
+    /*let default_host = pa::host::get_default_api();
     println!("PA host: {}", default_host);
     let api_info = pa::host::get_api_info(default_host);
     let api_info_str = match api_info {
         None       => "N/A".to_string(),
         Some(info) => info.name,
     };
-    println!("PA API info: {}", api_info_str);
-    
+    println!("PA API info: {}", api_info_str);*/
+
     // Get the first available monitor
     let _monitor = glutin::get_available_monitors().nth(0).unwrap();
-    
+
     // Construct a window
     let wb = glutin::WindowBuilder::new()
              .with_title("glmoi".to_string())
@@ -57,19 +73,24 @@ fn main() {
     let window = wb.build().unwrap();
     let _ = unsafe { window.make_current() };
     let _ = window.set_cursor_state(glutin::CursorState::Hide);
-    
+
     // Initialize GL
     gl::load_with(|symbol| window.get_proc_address(symbol));
-    
+
     let (major, minor) = gl_version();
     println!("OpenGL version: {}.{}", major, minor);
-    
+
     // Compile and link shaders
     let vs = Shader::new(VS_SRC, gl::VERTEX_SHADER);
     let fs = Shader::new(FS_SRC, gl::FRAGMENT_SHADER);
     let program = Program::new(&vs, &fs);
 
-    let fs_resolution_loc = unsafe { gl::GetUniformLocation(program.id, str_ptr("u_resolution")) };
+    let fs_resolution_loc = unsafe {
+        gl::GetUniformLocation(program.id, str_ptr("u_resolution"))
+    };
+    let fs_time_loc = unsafe {
+        gl::GetUniformLocation(program.id, str_ptr("u_time"))
+    };
 
     let mut vao = 0;
     let mut vbo = 0;
@@ -80,7 +101,7 @@ fn main() {
          1.0,  1.0, 0.0,
         -1.0,  1.0, 0.0
     ];
-    
+
     unsafe {
         // Create Vertex Array Object
         gl::GenVertexArrays(1, &mut vao);
@@ -105,32 +126,45 @@ fn main() {
                                 gl::FALSE as GLboolean, 0, ptr::null());
     }
 
-    for event in window.wait_events() {
+    loop {
+        let mut end = false;
+        for event in window.poll_events() {
+            match event {
+                Closed
+                    => { end = true; },
+                KeyboardInput(Pressed, _, Some(Escape))
+                    => { end = true; },
+                _
+                    => println!("{:?}", event)
+            };
+        }
+
+        if end {
+            break;
+        }
+
+        let position = match player.position() {
+            None    => { break; },
+            Some(p) => p
+        };
+
         unsafe {
             let (width, height) = match window.get_inner_size() {
                 Some(sz) => sz,
                 None     => (0, 0)
             };
             gl::Uniform2f(fs_resolution_loc, width as GLfloat, height as GLfloat);
-                        
+            gl::Uniform1f(fs_time_loc, position as GLfloat);
+
             // Clear the screen to black
             gl::ClearColor(0.0, 0.0, 0.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
 
             // Draw
             gl::DrawArrays(gl::TRIANGLE_FAN, 0, (vertices.len()) as i32);
-            
+
         };
         let _ = window.swap_buffers();
-
-        match event {
-            Closed
-                => break,
-            KeyboardInput(Pressed, _, Some(Escape))
-                => break,
-            _
-                => println!("{:?}", event)
-        }
     }
 }
 
