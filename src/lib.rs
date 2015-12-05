@@ -1,5 +1,6 @@
 extern crate gl;
 extern crate glutin;
+extern crate notify;
 extern crate time;
 
 pub mod options;
@@ -12,6 +13,7 @@ use std::io::Read;
 use std::mem;
 use std::ptr;
 use std::os::raw;
+use std::sync::mpsc::channel;
 
 use gl::types::*;
 use glutin::ElementState::*;
@@ -19,6 +21,7 @@ use glutin::Event::*;
 use glutin::VirtualKeyCode::*;
 use glutin::Window;
 use glutin::WindowBuilder;
+use notify::{RecommendedWatcher, Watcher};
 use time::SteadyTime;
 
 use shaders::{Program, Shader};
@@ -80,7 +83,7 @@ impl Varjokuuntelu {
         }
         
         let (program, fs_resolution_loc, fs_time_loc) =
-            Varjokuuntelu::load_fragment_shader_raw(&fs_path);
+            load_fragment_shader_raw(&fs_path);
                 
         Varjokuuntelu {
             fragment_shader_path: fs_path,
@@ -112,28 +115,10 @@ impl Varjokuuntelu {
             );
         };
     }
-    
-    fn load_fragment_shader_raw(path: &str) -> (Program, i32, i32) {
-        let vertex_shader = Shader::new(VERTEX_SHADER_SRC, gl::VERTEX_SHADER);
-        
-        let fragment_shader = get_fragment_shader(path);
-        let program = Program::new(
-            vertex_shader,
-            fragment_shader,
-            &vec![U_RESOLUTION, U_TIME]
-        );
-        
-        let fs_resolution_loc = program.get_fragment_uniform(U_RESOLUTION).unwrap();
-        let fs_time_loc = program.get_fragment_uniform(U_TIME).unwrap();
-    
-        (program, fs_resolution_loc, fs_time_loc)
-    }
-        
+            
     fn load_fragment_shader(&self) {
         let (program, fs_resolution_loc, fs_time_loc) =
-            Varjokuuntelu::load_fragment_shader_raw(
-                &self.fragment_shader_path
-            );
+            load_fragment_shader_raw(&self.fragment_shader_path);
         *self.program.borrow_mut() = program;
         self.enable_program();
         
@@ -149,10 +134,7 @@ impl Varjokuuntelu {
                     { end = true; },
                 KeyboardInput(Pressed, _, Some(Escape)) =>
                     { end = true; },
-                KeyboardInput(Pressed, _, Some(Return)) =>
-                    self.load_fragment_shader(),
                 _ =>
-                    //println!("{:?}", event)
                     ()
             };
         }
@@ -187,6 +169,14 @@ impl Varjokuuntelu {
     }
     
     pub fn run(&self) {
+        let (major, minor) = gl_version();
+        println!("OpenGL version: {}.{}", major, minor);
+        
+        let (tx, rx) = channel();
+        
+        let mut watcher: RecommendedWatcher = Watcher::new(tx).unwrap();
+        watcher.watch(&self.fragment_shader_path).unwrap();
+        
         self.enable_program();
         let start_time = SteadyTime::now();
 
@@ -195,6 +185,11 @@ impl Varjokuuntelu {
             if end {
                 break;
             }
+            
+            match rx.try_recv() {
+                Ok(_) => self.load_fragment_shader(),
+                Err(_) => ()
+            };
 
             let time = {
                 let diff = SteadyTime::now() - start_time;
@@ -260,6 +255,14 @@ fn init_window(
     window
 }
 
+fn gl_version() -> (GLint, GLint) {
+    let mut major: GLint = -1;
+    unsafe { gl::GetIntegerv(gl::MAJOR_VERSION, &mut major) };
+    let mut minor: GLint = -1;
+    unsafe { gl::GetIntegerv(gl::MINOR_VERSION, &mut minor) };
+    (major, minor)
+}
+
 fn get_fragment_shader(path: &str) -> Shader {
     let fragment_shader_src = {
         let mut file = File::open(path).unwrap();
@@ -269,4 +272,20 @@ fn get_fragment_shader(path: &str) -> Shader {
     };
 
     Shader::new(&fragment_shader_src, gl::FRAGMENT_SHADER)
+}
+
+fn load_fragment_shader_raw(path: &str) -> (Program, i32, i32) {
+    let vertex_shader = Shader::new(VERTEX_SHADER_SRC, gl::VERTEX_SHADER);
+    
+    let fragment_shader = get_fragment_shader(path);
+    let program = Program::new(
+        vertex_shader,
+        fragment_shader,
+        &vec![U_RESOLUTION, U_TIME]
+    );
+    
+    let fs_resolution_loc = program.get_fragment_uniform(U_RESOLUTION).unwrap();
+    let fs_time_loc = program.get_fragment_uniform(U_TIME).unwrap();
+
+    (program, fs_resolution_loc, fs_time_loc)
 }
