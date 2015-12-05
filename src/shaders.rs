@@ -51,19 +51,19 @@ impl Drop for Shader {
     }
 }
 
-pub struct Program<'a> {
+pub struct Program {
     pub id: GLuint,
-    pub vertex_shader: &'a Shader,
-    pub fragment_shader: &'a Shader,
+    pub vertex_shader: Shader,
+    pub fragment_shader: Shader,
     pub fragment_uniforms: HashMap<String, i32>
 }
 
-impl<'a> Program<'a> {
+impl Program {
     pub fn new(
-        vertex_shader: &'a Shader,
-        fragment_shader: &'a Shader,
+        vertex_shader: Shader,
+        fragment_shader: Shader,
         fragment_uniforms: &[&str]
-    ) -> Program<'a> {
+    ) -> Program {
         unsafe {
             let program = gl::CreateProgram();
             gl::AttachShader(program, vertex_shader.id);
@@ -110,7 +110,7 @@ impl<'a> Program<'a> {
     }
 }
 
-impl<'a> Drop for Program<'a> {
+impl Drop for Program {
     fn drop(&mut self) {
         unsafe { gl::DeleteProgram(self.id); };
     }
