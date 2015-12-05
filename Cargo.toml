@@ -12,6 +12,7 @@ name = "varjokuuntelija"
 path = "src/main.rs"
 
 [dependencies]
+getopts = "0.2"
 gl = "0.5"
 glutin = "0.4"
 time = "0.1"

@@ -1,3 +1,4 @@
+pub mod options;
 pub mod shaders;
 
 use std::ffi::CString;

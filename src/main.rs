@@ -17,6 +17,7 @@ use glutin::WindowBuilder;
 use time::Duration;
 use time::SteadyTime;
 
+use varjokuuntelu::options;
 use varjokuuntelu::str_ptr;
 use varjokuuntelu::shaders::{Program, Shader};
 
@@ -34,35 +35,48 @@ fn gl_version() -> (GLint, GLint) {
     (major, minor)
 }
 
-fn init_window(monitor_ix: usize, dimensions: (u32, u32)) -> Window {
-    let mut monitors = glutin::get_available_monitors();
-    println!("Monitors:");
-    let mut monitor_opt = None;
-    for (i, m) in monitors.enumerate() {
-        let name = m.get_name().unwrap_or("<Unknown>".to_string());
-        
-        if i == monitor_ix {
-            monitor_opt = Some(m);
-            print!("* ");
-        } else {
-            print!("  ");
-        }
-        
-        println!("[{}] {}", i, name);
-    }
-    
-    let monitor = monitor_opt.unwrap();
-    let (width, height) = dimensions;
-
+fn init_window(
+    dimensions_opt: Option<(u32, u32)>,
+    fullscreen_monitor_ix_opt: Option<usize>
+) -> Window {
     // Construct a window
-    let wb = WindowBuilder::new()
+    let mut wb = WindowBuilder::new()
         .with_title("varjokuuntelija".to_string())
-        .with_dimensions(width, height)
-        .with_fullscreen(monitor)
         .with_vsync()
         .with_gl(glutin::GlRequest::Latest)
         .with_gl_profile(glutin::GlProfile::Core)
+        .with_srgb(Some(true))
         ;
+
+    // Add dimensions if specified
+    if let Some((width, height)) = dimensions_opt {
+        wb = wb.with_dimensions(width, height);
+    }
+
+    // Add fullscreen monitor if specified
+    if let Some(fullscreen_monitor_ix) = fullscreen_monitor_ix_opt {
+        let monitors = glutin::get_available_monitors();
+        
+        println!("Monitors:");
+        let mut monitor_opt = None;
+        for (i, m) in monitors.enumerate() {
+            let name = m.get_name().unwrap_or("<Unknown>".to_string());
+    
+            if i == fullscreen_monitor_ix {
+                monitor_opt = Some(m);
+                print!("* ");
+            } else {
+                print!("  ");
+            }
+    
+            println!("[{}] {}", i, name);
+        }
+        
+        let fullscreen_monitor = monitor_opt.unwrap();
+        
+        wb = wb.with_fullscreen(fullscreen_monitor);
+    }
+    
     let window = wb.build_strict().unwrap();
     let _ = unsafe { window.make_current() };
 
@@ -169,8 +183,14 @@ fn render(
 }
 
 fn main() {
-    let monitor_ix = 0;
-    let dimensions = (1440, 900);
+    let (dimensions_opt, fullscreen_monitor_opt) =
+        match options::get_options() {
+            Ok(opts) => opts,
+            Err(msg) => {
+                println!("{}", msg);
+                return;
+            }
+        };
     
     let vertices: [GLfloat; 12] = [
         -1.0, -1.0, 0.0,
@@ -179,7 +199,7 @@ fn main() {
         -1.0,  1.0, 0.0
     ];
     
-    let window = init_window(monitor_ix, dimensions);
+    let window = init_window(dimensions_opt, fullscreen_monitor_opt);
     
     let (major, minor) = gl_version();
     println!("OpenGL version: {}.{}", major, minor);
