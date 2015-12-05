@@ -4,6 +4,8 @@ extern crate time;
 
 extern crate varjokuuntelu;
 
+use std::fs::File;
+use std::io::Read;
 use std::mem;
 use std::ptr;
 use std::os::raw;
@@ -22,7 +24,6 @@ use varjokuuntelu::str_ptr;
 use varjokuuntelu::shaders::{Program, Shader};
 
 static VS_SRC: &'static str = include_str!("glsl/default.vert");
-static FS_SRC: &'static str = include_str!("glsl/default.frag");
 
 static U_RESOLUTION: &'static str = "u_resolution";
 static U_TIME: &'static str = "u_time";
@@ -88,9 +89,15 @@ fn init_window(
     window
 }
 
-fn load_shaders() -> (Shader, Shader) {
+fn load_shaders(fs_path: &str) -> (Shader, Shader) {
     let vs = Shader::new(VS_SRC, gl::VERTEX_SHADER);
-    let fs = Shader::new(FS_SRC, gl::FRAGMENT_SHADER);
+    
+    let mut file = File::open(fs_path).unwrap();
+    let mut fs_src = String::new();
+    file.read_to_string(&mut fs_src).unwrap();
+
+    let fs = Shader::new(&fs_src, gl::FRAGMENT_SHADER);
+    
     (vs, fs)
 }
 
@@ -183,7 +190,7 @@ fn render(
 }
 
 fn main() {
-    let (dimensions_opt, fullscreen_monitor_opt) =
+    let (fs_path, dimensions_opt, fullscreen_monitor_opt) =
         match options::get_options() {
             Ok(opts) => opts,
             Err(msg) => {
@@ -204,7 +211,7 @@ fn main() {
     let (major, minor) = gl_version();
     println!("OpenGL version: {}.{}", major, minor);
 
-    let (vs, fs) = load_shaders();
+    let (vs, fs) = load_shaders(&fs_path);
     let program = init_rendering(&vs, &fs, &vertices);
     let fs_resolution_loc = program.get_fragment_uniform(U_RESOLUTION).unwrap();
     let fs_time_loc = program.get_fragment_uniform(U_TIME).unwrap();
