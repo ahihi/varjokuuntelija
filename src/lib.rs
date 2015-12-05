@@ -64,7 +64,7 @@ impl Varjokuuntelu {
         
         let window = init_window(dimensions_opt, fullscreen_monitor_opt);
         
-        // Set up Vertax Array Object and Vertex Buffer Object
+        // Set up Vertex Array Object and Vertex Buffer Object
         let mut vao = 0;
         let mut vbo = 0;
 
