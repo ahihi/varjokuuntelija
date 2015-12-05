@@ -11,6 +11,7 @@ use std::ffi::CString;
 use std::fs::File;
 use std::io::Read;
 use std::mem;
+use std::process;
 use std::ptr;
 use std::os::raw;
 use std::sync::mpsc::channel;
@@ -56,7 +57,8 @@ impl Varjokuuntelu {
             match options::get_options() {
                 Ok(opts) => opts,
                 Err(msg) => {
-                    panic!("{}", msg);
+                    println!("{}", msg);
+                    process::exit(1);
                 }
             };
         
