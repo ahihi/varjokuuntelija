@@ -1,25 +1,18 @@
 [package]
-name = "glmoi"
+name = "varjokuuntelija"
 version = "0.1.0"
-authors = ["Miranda Kastemaa <miranda@foldplop.com>", "Nils Haglund <shiensha@gmail.com>"]
+authors = ["Miranda Kastemaa <miranda@foldplop.com>"]
 
 [lib]
-name = "glmoi"
+name = "varjokuuntelu"
 path = "src/lib.rs"
 
 [[bin]]
-name = "glmoi-demo"
+name = "varjokuuntelija"
 path = "src/main.rs"
 
 [dependencies]
-glutin = "0.2"
-libc = "0.1"
-
-[dependencies.gl]
-git = "https://github.com/bjz/gl-rs"
-
-[dependencies.portaudio]
-git = "https://github.com/ahihi/rust-portaudio"
-
-[dependencies.demonplayer]
-git = "https://github.com/ahihi/demonplayer.git"
+gl = "0.5"
+glutin = "0.4"
+time = "0.1"
+#libc = "0.1"

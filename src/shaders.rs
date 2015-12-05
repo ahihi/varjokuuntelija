@@ -1,9 +1,12 @@
 extern crate gl;
 
 use self::gl::types::*;
+use std::collections::HashMap;
 use std::ptr;
 use std::str;
 use std::ffi::CString;
+
+use ::str_ptr;
 
 pub struct Shader {
     pub id: GLuint,
@@ -33,7 +36,7 @@ impl Shader {
                 gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
                 panic!("{}", str::from_utf8(&buf).ok().expect("ShaderInfoLog not valid utf8"));
             }
-            
+                        
             Shader {
                 id: shader,
                 kind: kind
@@ -51,11 +54,16 @@ impl Drop for Shader {
 pub struct Program<'a> {
     pub id: GLuint,
     pub vertex_shader: &'a Shader,
-    pub fragment_shader: &'a Shader
+    pub fragment_shader: &'a Shader,
+    pub fragment_uniforms: HashMap<String, i32>
 }
 
 impl<'a> Program<'a> {
-    pub fn new(vertex_shader: &'a Shader, fragment_shader: &'a Shader) -> Program<'a> {
+    pub fn new(
+        vertex_shader: &'a Shader,
+        fragment_shader: &'a Shader,
+        fragment_uniforms: &[&str]
+    ) -> Program<'a> {
         unsafe {
             let program = gl::CreateProgram();
             gl::AttachShader(program, vertex_shader.id);
@@ -76,16 +84,29 @@ impl<'a> Program<'a> {
                 panic!("{}", str::from_utf8(&buf).ok().expect("ProgramInfoLog not valid utf8"));
             }
             
+            // Get uniform locations
+            let mut fragment_uniform_map: HashMap<String, i32> = HashMap::new();
+            for uniform in fragment_uniforms {
+                let location = gl::GetUniformLocation(program, str_ptr(uniform));
+                fragment_uniform_map.insert(uniform.to_string(), location);
+            }
+            
             Program {
                 id: program,
                 vertex_shader: vertex_shader,
-                fragment_shader: fragment_shader
+                fragment_shader: fragment_shader,
+                fragment_uniforms: fragment_uniform_map
             }
         }
     }
     
     pub fn enable(&self) {
         unsafe { gl::UseProgram(self.id); }
+    }
+    
+    pub fn get_fragment_uniform(&self, name: &str) -> Option<i32> {
+        self.fragment_uniforms.get(name)
+            .map(|x| *x)
     }
 }
 
