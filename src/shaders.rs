@@ -2,11 +2,13 @@ extern crate gl;
 
 use self::gl::types::*;
 use std::collections::HashMap;
+use std::error::Error;
 use std::ptr;
 use std::str;
 use std::ffi::CString;
 
 use ::str_ptr;
+use error::CustomError;
 
 pub struct Shader {
     pub id: GLuint,
@@ -14,15 +16,15 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn new(src: &str, kind: GLenum) -> Shader {
+    pub fn new(src: &str, kind: GLenum) -> Result<Shader, Box<Error>> {
         unsafe {
             let shader = gl::CreateShader(kind);
             
             // Attempt to compile the shader
-            let c_str = CString::new(src.as_bytes()).unwrap();
+            let c_str = try!(CString::new(src.as_bytes()));
             gl::ShaderSource(shader, 1, &c_str.as_ptr(), ptr::null());
             gl::CompileShader(shader);
-
+        
             // Get the compile status
             let mut status = gl::FALSE as GLint;
             gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut status);
@@ -34,12 +36,16 @@ impl Shader {
                 let mut buf = Vec::with_capacity(len as usize);
                 buf.set_len((len as usize) - 1); // subtract 1 to skip the trailing null character
                 gl::GetShaderInfoLog(shader, len, ptr::null_mut(), buf.as_mut_ptr() as *mut GLchar);
-                panic!("{}", str::from_utf8(&buf).ok().expect("ShaderInfoLog not valid utf8"));
-            }
-                        
-            Shader {
-                id: shader,
-                kind: kind
+                Err(From::from(CustomError::new(
+                    str::from_utf8(&buf).ok()
+                        .expect("ShaderInfoLog not valid utf8")
+                        .trim_right()
+                )))
+            } else {
+                Ok(Shader {
+                    id: shader,
+                    kind: kind
+                })
             }
         }
     }

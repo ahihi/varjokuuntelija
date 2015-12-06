@@ -3,15 +3,16 @@ extern crate glutin;
 extern crate notify;
 extern crate time;
 
+pub mod error;
 pub mod options;
 pub mod shaders;
 
 use std::cell::{Cell, RefCell};
+use std::error::Error;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::Read;
 use std::mem;
-use std::process;
 use std::ptr;
 use std::os::raw;
 use std::sync::mpsc::channel;
@@ -25,6 +26,7 @@ use glutin::WindowBuilder;
 use notify::{RecommendedWatcher, Watcher};
 use time::SteadyTime;
 
+use error::CustomError;
 use shaders::{Program, Shader};
 
 static VERTICES: [GLfloat; 12] = [
@@ -52,15 +54,11 @@ pub struct Varjokuuntelu {
 }
 
 impl Varjokuuntelu {
-    pub fn new() -> Varjokuuntelu {
-        let (fs_path, dimensions_opt, fullscreen_monitor_opt) =
-            match options::get_options() {
-                Ok(opts) => opts,
-                Err(msg) => {
-                    println!("{}", msg);
-                    process::exit(1);
-                }
-            };
+    pub fn new() -> Result<Varjokuuntelu, Box<Error>> {
+        let (fs_path, dimensions_opt, fullscreen_monitor_opt) = try!(
+            options::get_options()
+                .map_err(|msg| CustomError::new(&msg))
+        );
         
         let window = init_window(dimensions_opt, fullscreen_monitor_opt);
         
@@ -84,16 +82,27 @@ impl Varjokuuntelu {
             );
         }
         
+        print!("Loading {}... ", fs_path);
         let (program, fs_resolution_loc, fs_time_loc) =
-            load_fragment_shader_raw(&fs_path);
+            try!(match load_fragment_shader_raw(&fs_path) {
+                Ok(result) => {
+                    println!("ok");
+                    Ok(result)
+                },
                 
-        Varjokuuntelu {
+                Err(e) => {
+                    println!("failed");
+                    Err(e)
+                }
+            });
+        
+        Ok(Varjokuuntelu {
             fragment_shader_path: fs_path,
             window: window,
             program: RefCell::new(program),
             fs_resolution_loc: Cell::new(fs_resolution_loc),
             fs_time_loc: Cell::new(fs_time_loc)
-        }
+        })
     }
     
     fn enable_program(&self) {
@@ -118,14 +127,16 @@ impl Varjokuuntelu {
         };
     }
             
-    fn load_fragment_shader(&self) {
+    fn load_fragment_shader(&self) -> Result<(), Box<Error>> {
         let (program, fs_resolution_loc, fs_time_loc) =
-            load_fragment_shader_raw(&self.fragment_shader_path);
+            try!(load_fragment_shader_raw(&self.fragment_shader_path));
         *self.program.borrow_mut() = program;
         self.enable_program();
         
         self.fs_resolution_loc.set(fs_resolution_loc);
         self.fs_time_loc.set(fs_time_loc);
+        
+        Ok(())
     }
     
     fn handle_window_events(&self) -> bool {
@@ -189,7 +200,14 @@ impl Varjokuuntelu {
             }
             
             match rx.try_recv() {
-                Ok(_) => self.load_fragment_shader(),
+                Ok(_) => {
+                    print!("Reloading {}... ", self.fragment_shader_path);
+                    match self.load_fragment_shader() {
+                        Ok(_) => println!("ok"),
+                        Err(e) => println!("failed\n{}", e.description()),
+                    }
+                },
+                    
                 Err(_) => ()
             };
 
@@ -265,21 +283,29 @@ fn gl_version() -> (GLint, GLint) {
     (major, minor)
 }
 
-fn get_fragment_shader(path: &str) -> Shader {
+fn get_fragment_shader(path: &str) -> Result<Shader, Box<Error>> {
     let fragment_shader_src = {
-        let mut file = File::open(path).unwrap();
+        let mut file = try!(
+            File::open(path)
+                .map_err(|e| CustomError::new(
+                    &format!("Failed to open file ({:?})", e.kind()))
+                )
+        );
         let mut src = String::new();
-        file.read_to_string(&mut src).unwrap();
+        try!(
+            file.read_to_string(&mut src)
+                .map_err(|_| CustomError::new("Failed to read file"))
+        );
         src
     };
 
     Shader::new(&fragment_shader_src, gl::FRAGMENT_SHADER)
 }
 
-fn load_fragment_shader_raw(path: &str) -> (Program, i32, i32) {
-    let vertex_shader = Shader::new(VERTEX_SHADER_SRC, gl::VERTEX_SHADER);
+fn load_fragment_shader_raw(path: &str) -> Result<(Program, i32, i32), Box<Error>> {
+    let vertex_shader = try!(Shader::new(VERTEX_SHADER_SRC, gl::VERTEX_SHADER));
     
-    let fragment_shader = get_fragment_shader(path);
+    let fragment_shader = try!(get_fragment_shader(path));
     let program = Program::new(
         vertex_shader,
         fragment_shader,
@@ -289,5 +315,5 @@ fn load_fragment_shader_raw(path: &str) -> (Program, i32, i32) {
     let fs_resolution_loc = program.get_fragment_uniform(U_RESOLUTION).unwrap();
     let fs_time_loc = program.get_fragment_uniform(U_TIME).unwrap();
 
-    (program, fs_resolution_loc, fs_time_loc)
+    Ok((program, fs_resolution_loc, fs_time_loc))
 }

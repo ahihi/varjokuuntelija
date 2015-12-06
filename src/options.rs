@@ -3,40 +3,14 @@ extern crate getopts;
 use std::boxed::Box;
 use std::env;
 use std::error::Error;
-use std::fmt;
 
 use self::getopts::Options;
+
+use error::CustomError;
 
 fn usage(program: &str, opts: Options) -> String {
     let brief = format!("Usage: {} [options] FILE", program);
     format!("{}", opts.usage(&brief))
-}
-
-#[derive(Debug)]
-struct CustomError {
-    pub message: String
-}
-
-impl CustomError {
-    fn new(message: &str) -> CustomError {
-        CustomError { message: message.to_string() }
-    } 
-}
-
-impl fmt::Display for CustomError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl Error for CustomError {
-    fn description(&self) -> &str {
-        &self.message
-    }
-    
-    fn cause(&self) -> Option<&Error> {
-        None
-    }
 }
 
 fn get_options_raw(
