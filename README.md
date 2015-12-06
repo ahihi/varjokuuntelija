@@ -11,3 +11,5 @@ Options:
     -f, --fullscreen INDEX
                         enable full screen mode on display INDEX
 ```
+
+![Screenshot](http://i.imgur.com/GMtEpWS.png)
