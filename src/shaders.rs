@@ -110,9 +110,10 @@ impl Program {
         unsafe { gl::UseProgram(self.id); }
     }
     
-    pub fn get_fragment_uniform(&self, name: &str) -> Option<i32> {
+    pub fn get_fragment_uniform(&self, name: &str) -> Result<i32, CustomError> {
         self.fragment_uniforms.get(name)
             .map(|x| *x)
+            .ok_or(CustomError::new(&format!("Failed to get location of uniform {}", name)))
     }
 }
 

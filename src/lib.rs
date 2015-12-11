@@ -60,7 +60,7 @@ impl Varjokuuntelu {
                 .map_err(|msg| CustomError::new(&msg))
         );
         
-        let window = init_window(dimensions_opt, fullscreen_monitor_opt);
+        let window = try!(init_window(dimensions_opt, fullscreen_monitor_opt));
         
         // Set up Vertex Array Object and Vertex Buffer Object
         let mut vao = 0;
@@ -225,7 +225,7 @@ impl Varjokuuntelu {
 fn init_window(
     dimensions_opt: Option<(u32, u32)>,
     fullscreen_monitor_ix_opt: Option<usize>
-) -> Window {
+) -> Result<Window, Box<Error>> {
     // Construct a window
     let mut wb = WindowBuilder::new()
         .with_title("varjokuuntelija".to_string())
@@ -259,12 +259,16 @@ fn init_window(
             println!("[{}] {}", i, name);
         }
         
-        let fullscreen_monitor = monitor_opt.unwrap();
+        let fullscreen_monitor = try!(
+            monitor_opt.ok_or(CustomError::new(
+                &format!("Unable to get monitor {}", fullscreen_monitor_ix))
+            )
+        );
         
         wb = wb.with_fullscreen(fullscreen_monitor);
     }
     
-    let window = wb.build_strict().unwrap();
+    let window = try!(wb.build_strict());
     let _ = unsafe { window.make_current() };
 
     // Initialize GL
@@ -272,7 +276,7 @@ fn init_window(
         |symbol| window.get_proc_address(symbol) as *const raw::c_void
     );
     
-    window
+    Ok(window)
 }
 
 fn gl_version() -> (GLint, GLint) {
@@ -312,8 +316,8 @@ fn load_fragment_shader_raw(path: &str) -> Result<(Program, i32, i32), Box<Error
         &vec![U_RESOLUTION, U_TIME]
     );
     
-    let fs_resolution_loc = program.get_fragment_uniform(U_RESOLUTION).unwrap();
-    let fs_time_loc = program.get_fragment_uniform(U_TIME).unwrap();
+    let fs_resolution_loc = try!(program.get_fragment_uniform(U_RESOLUTION));
+    let fs_time_loc = try!(program.get_fragment_uniform(U_TIME));
 
     Ok((program, fs_resolution_loc, fs_time_loc))
 }
