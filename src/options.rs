@@ -1,7 +1,6 @@
 extern crate getopts;
 
 use std::boxed::Box;
-use std::env;
 use std::error::Error;
 
 use self::getopts::Options;
@@ -21,9 +20,7 @@ fn get_options_raw(
     opts.optopt("h", "height", "resolution height", "PIXELS");
     opts.optopt("f", "fullscreen", "enable full screen mode on display INDEX", "INDEX");
     
-    let matches = try!(
-        opts.parse(args)
-    );
+    let matches = try!(opts.parse(args));
     
     let resolution_opt = match (matches.opt_str("w"), matches.opt_str("h")) {
         (Some(w_str), Some(h_str)) => {
@@ -61,8 +58,7 @@ fn get_options_raw(
     Ok((fs_path, resolution_opt, fullscreen_monitor_ix_opt))
 }
 
-pub fn get_options() -> Result<(String, Option<(u32, u32)>, Option<usize>), String> {
-    let args: Vec<String> = env::args().collect();
+pub fn get_options(args: &[String]) -> Result<(String, Option<(u32, u32)>, Option<usize>), String> {
     let program = args[0].clone();
     let mut opts = Options::new();
         

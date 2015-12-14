@@ -1,13 +1,16 @@
 extern crate gl;
 extern crate glutin;
 extern crate notify;
+extern crate portmidi as pm;
 extern crate time;
 
 pub mod error;
+pub mod midi;
 pub mod options;
 pub mod shaders;
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::CString;
 use std::fs::File;
@@ -27,7 +30,11 @@ use notify::{RecommendedWatcher, Watcher};
 use time::SteadyTime;
 
 use error::CustomError;
+use midi::{CcKey, MidiInputs};
 use shaders::{Program, Shader};
+
+type UniformLoc = i32;
+type CcLocMap = HashMap<CcKey, UniformLoc>;
 
 static VERTICES: [GLfloat; 12] = [
     -1.0, -1.0, 0.0,
@@ -49,14 +56,17 @@ pub struct Varjokuuntelu {
     fragment_shader_path: String,
     window: Window,
     program: RefCell<Program>,
-    fs_resolution_loc: Cell<i32>,
-    fs_time_loc: Cell<i32>
+    fs_resolution_loc: Cell<UniformLoc>,
+    fs_time_loc: Cell<UniformLoc>,
+    midi_inputs: RefCell<MidiInputs>,
+    midi_locs: RefCell<CcLocMap>,
+    midi_state: RefCell<HashMap<UniformLoc, GLfloat>>
 }
 
 impl Varjokuuntelu {
-    pub fn new() -> Result<Varjokuuntelu, Box<Error>> {
+    pub fn new(args: &[String]) -> Result<Varjokuuntelu, Box<Error>> {
         let (fs_path, dimensions_opt, fullscreen_monitor_opt) = try!(
-            options::get_options()
+            options::get_options(args)
                 .map_err(|msg| CustomError::new(&msg))
         );
         
@@ -81,9 +91,9 @@ impl Varjokuuntelu {
                 gl::STATIC_DRAW
             );
         }
-        
+                
         print!("Loading {}... ", fs_path);
-        let (program, fs_resolution_loc, fs_time_loc) =
+        let (program, fs_resolution_loc, fs_time_loc, midi_locs) =
             try!(match load_fragment_shader_raw(&fs_path) {
                 Ok(result) => {
                     println!("ok");
@@ -96,12 +106,18 @@ impl Varjokuuntelu {
                 }
             });
         
+        let midi_device_ids = vec![0];
+        let midi_inputs = try!(MidiInputs::new(&midi_device_ids));
+            
         Ok(Varjokuuntelu {
             fragment_shader_path: fs_path,
             window: window,
             program: RefCell::new(program),
             fs_resolution_loc: Cell::new(fs_resolution_loc),
-            fs_time_loc: Cell::new(fs_time_loc)
+            fs_time_loc: Cell::new(fs_time_loc),
+            midi_inputs: RefCell::new(midi_inputs),
+            midi_locs: RefCell::new(midi_locs),
+            midi_state: RefCell::new(HashMap::new())
         })
     }
     
@@ -128,13 +144,17 @@ impl Varjokuuntelu {
     }
             
     fn load_fragment_shader(&self) -> Result<(), Box<Error>> {
-        let (program, fs_resolution_loc, fs_time_loc) =
+        let (program, fs_resolution_loc, fs_time_loc, midi_locs) =
             try!(load_fragment_shader_raw(&self.fragment_shader_path));
         *self.program.borrow_mut() = program;
         self.enable_program();
         
         self.fs_resolution_loc.set(fs_resolution_loc);
         self.fs_time_loc.set(fs_time_loc);
+        {
+            let mut self_midi_locs = self.midi_locs.borrow_mut();
+            *self_midi_locs = midi_locs;
+        }
         
         Ok(())
     }
@@ -152,6 +172,27 @@ impl Varjokuuntelu {
             };
         }
         end
+    }
+    
+    fn handle_midi_events(&self) {
+        let midi_events = {
+            let mut midi_inputs = self.midi_inputs.borrow_mut();
+            match midi_inputs.read_cc() {
+                Ok(cc) => cc,
+                Err(_) => {
+                    println!("Warning: Failed to read MIDI events");
+                    Vec::new()
+                }
+            }
+        };
+        
+        let midi_locs = self.midi_locs.borrow();
+        let mut midi_state = self.midi_state.borrow_mut();
+        for event in midi_events.into_iter() {
+            if let Some(&loc) = midi_locs.get(&event.key) {
+                midi_state.insert(loc, event.value as GLfloat);
+            }
+        }
     }
     
     fn render(&self, time: GLfloat) {
@@ -172,6 +213,19 @@ impl Varjokuuntelu {
                 time
             );
 
+            // Pass midi uniforms
+            self.handle_midi_events();
+            for &loc in self.midi_locs.borrow().values() {
+                let value = match self.midi_state.borrow().get(&loc) {
+                    Some(&v) => v,
+                    None => 0 as GLfloat
+                };
+                gl::Uniform1f(
+                    loc,
+                    value
+                );
+            }
+
             // Clear the screen to black
             gl::ClearColor(0.0, 0.0, 0.0, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
@@ -189,6 +243,8 @@ impl Varjokuuntelu {
         
         let mut watcher: RecommendedWatcher = Watcher::new(tx).unwrap();
         watcher.watch(&self.fragment_shader_path).unwrap();
+        
+        self.midi_inputs.borrow_mut().open().unwrap();
         
         self.enable_program();
         let start_time = SteadyTime::now();
@@ -211,6 +267,7 @@ impl Varjokuuntelu {
                 Err(_) => ()
             };
 
+
             let time = {
                 let diff = SteadyTime::now() - start_time;
                 0.001 * diff.num_milliseconds() as GLfloat
@@ -219,6 +276,8 @@ impl Varjokuuntelu {
         
             let _ = self.window.swap_buffers();
         }
+        
+        self.midi_inputs.borrow_mut().close().unwrap();
     }
 }
 
@@ -306,18 +365,31 @@ fn get_fragment_shader(path: &str) -> Result<Shader, Box<Error>> {
     Shader::new(&fragment_shader_src, gl::FRAGMENT_SHADER)
 }
 
-fn load_fragment_shader_raw(path: &str) -> Result<(Program, i32, i32), Box<Error>> {
+fn load_fragment_shader_raw(path: &str) -> Result<(Program, UniformLoc, UniformLoc, CcLocMap), Box<Error>> {
     let vertex_shader = try!(Shader::new(VERTEX_SHADER_SRC, gl::VERTEX_SHADER));
     
     let fragment_shader = try!(get_fragment_shader(path));
+    
+    // Test with one static CC
+    let U_CC66 = "u_cc66";
+    
     let program = Program::new(
         vertex_shader,
         fragment_shader,
-        &vec![U_RESOLUTION, U_TIME]
+        &vec![U_RESOLUTION, U_TIME, U_CC66]
     );
     
     let fs_resolution_loc = try!(program.get_fragment_uniform(U_RESOLUTION));
     let fs_time_loc = try!(program.get_fragment_uniform(U_TIME));
+    
+    let midi_locs = {
+        let mut locs = HashMap::new();
+        locs.insert(
+            CcKey { device_id: 0, channel: 1, cc: 66 },
+            try!(program.get_fragment_uniform(U_CC66))
+        );
+        locs
+    };    
 
-    Ok((program, fs_resolution_loc, fs_time_loc))
+    Ok((program, fs_resolution_loc, fs_time_loc, midi_locs))
 }

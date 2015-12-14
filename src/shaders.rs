@@ -1,11 +1,11 @@
-extern crate gl;
-
-use self::gl::types::*;
 use std::collections::HashMap;
 use std::error::Error;
+use std::ffi::CString;
 use std::ptr;
 use std::str;
-use std::ffi::CString;
+
+use ::gl;
+use ::gl::types::*;
 
 use ::str_ptr;
 use error::CustomError;

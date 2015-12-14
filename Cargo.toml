@@ -15,6 +15,7 @@ path = "src/main.rs"
 getopts = "0.2"
 gl = "0.5"
 notify = "2.5"
+portmidi = "0.1"
 time = "0.1"
 
 [dependencies.glutin]

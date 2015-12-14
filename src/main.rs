@@ -1,16 +1,26 @@
 extern crate varjokuuntelu;
 
+use std::env;
 use std::error::Error;
 use std::process;
 
 use varjokuuntelu::Varjokuuntelu;
+use varjokuuntelu::midi::MidiInputs;
 
 fn main() {
-    match Varjokuuntelu::new() {
-        Ok(vk) => vk.run(),
+    MidiInputs::initialize().unwrap();
+    let args: Vec<String> = env::args().collect();
+    
+    let exit_code = match Varjokuuntelu::new(&args) {
+        Ok(vk) => {
+            vk.run();
+            0
+        },
         Err(e) => {
             println!("{}", e.description());
-            process::exit(1);
+            1
         }
-    }
+    };
+    MidiInputs::terminate().unwrap();
+    process::exit(exit_code);
 }
