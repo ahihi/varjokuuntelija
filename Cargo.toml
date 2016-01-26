@@ -16,6 +16,7 @@ getopts = "0.2"
 gl = "0.5"
 notify = "2.5"
 portmidi = "0.1"
+rustc-serialize = "0.3"
 time = "0.1"
 
 [dependencies.glutin]

@@ -2,9 +2,13 @@ extern crate getopts;
 
 use std::boxed::Box;
 use std::error::Error;
+use std::fs::File;
+use std::io::Read;
 
 use self::getopts::Options;
+use ::rustc_serialize::json;
 
+use config::Config;
 use error::CustomError;
 
 fn usage(program: &str, opts: Options) -> String {
@@ -15,12 +19,32 @@ fn usage(program: &str, opts: Options) -> String {
 fn get_options_raw(
     args: &[String],
     opts: &mut Options
-) -> Result<(String, Option<(u32, u32)>, Option<usize>), Box<Error>> {    
+) -> Result<(Option<Config>, String, Option<(u32, u32)>, Option<usize>), Box<Error>> {
+    opts.optopt("c", "config", "configuration file", "FILE");
     opts.optopt("w", "width", "resolution width", "PIXELS");
     opts.optopt("h", "height", "resolution height", "PIXELS");
     opts.optopt("f", "fullscreen", "enable full screen mode on display INDEX", "INDEX");
     
     let matches = try!(opts.parse(args));
+    
+    let config = match matches.opt_str("c") {
+        Some(config_path) => {            
+            let json_str = {
+                let mut file = try!(File::open(&config_path));
+                
+                let mut s = String::new();
+                try!(file.read_to_string(&mut s));
+                s
+            };
+
+            let config: Config = try!(json::decode(&json_str));
+            
+            Some(config)
+        },
+        
+        None =>
+            None
+    };
     
     let resolution_opt = match (matches.opt_str("w"), matches.opt_str("h")) {
         (Some(w_str), Some(h_str)) => {
@@ -55,10 +79,10 @@ fn get_options_raw(
         return Err(From::from(CustomError::new("No file specified")));
     };
     
-    Ok((fs_path, resolution_opt, fullscreen_monitor_ix_opt))
+    Ok((config, fs_path, resolution_opt, fullscreen_monitor_ix_opt))
 }
 
-pub fn get_options(args: &[String]) -> Result<(String, Option<(u32, u32)>, Option<usize>), String> {
+pub fn get_options(args: &[String]) -> Result<(Option<Config>, String, Option<(u32, u32)>, Option<usize>), String> {
     let program = args[0].clone();
     let mut opts = Options::new();
         

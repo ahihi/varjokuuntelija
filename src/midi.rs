@@ -48,9 +48,14 @@ impl MidiInputs {
         let mut inputs = HashMap::new();
         
         for &id in device_ids {
-          if let Some(_) = pm::get_device_info(id) {
+            let device_info = try!(
+                pm::get_device_info(id)
+                    .ok_or(CustomError::new(
+                        &format!("Invalid device id: {}", id)
+                    ))
+            );
+            println!("{:?}", device_info);
             inputs.insert(id, InputPort::new(id, INPUT_BUFFER_SIZE));
-          }
         }
                 
         Ok(MidiInputs {
