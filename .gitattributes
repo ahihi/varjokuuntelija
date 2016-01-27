@@ -1,6 +1,5 @@
 * text eol=lf
 
-bin/jackmon text
 *.rs text
 *.toml text
 *.md text
