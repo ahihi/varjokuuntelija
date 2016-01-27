@@ -1,6 +1,6 @@
 # Varjokuuntelija
 
-A fragment shader renderer for prototyping/livecoding.
+A fragment shader renderer for prototyping/livecoding. [Video](http://omino.foldplop.com/~ahihi/Varjokuuntelija-demo.mp4)
 
 ![Screenshot](http://i.imgur.com/GMtEpWS.png)
 
