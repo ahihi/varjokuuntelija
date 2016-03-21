@@ -1,5 +1,7 @@
 # Varjokuuntelija
 
+[![Build Status](https://travis-ci.org/ahihi/varjokuuntelija.svg?branch=master)](https://travis-ci.org/ahihi/varjokuuntelija)
+
 A fragment shader renderer for prototyping/livecoding. [Video](http://omino.foldplop.com/~ahihi/Varjokuuntelija-demo.mp4)
 
 ![Screenshot](http://i.imgur.com/GMtEpWS.png)
