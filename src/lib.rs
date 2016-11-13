@@ -1,5 +1,5 @@
-extern crate gl;
-extern crate glutin;
+#[macro_use]
+extern crate glium;
 extern crate notify;
 extern crate portmidi as pm;
 extern crate rustc_serialize;
@@ -9,7 +9,7 @@ pub mod config;
 pub mod error;
 pub mod midi;
 pub mod options;
-pub mod shaders;
+//pub mod shaders;
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -23,35 +23,50 @@ use std::ptr;
 use std::os::raw;
 use std::sync::mpsc::channel;
 
-use gl::types::*;
+/*
 use glutin::Api;
 use glutin::ElementState::*;
 use glutin::Event::*;
 use glutin::VirtualKeyCode::*;
 use glutin::Window;
 use glutin::WindowBuilder;
+ */
+
+use glium::{Display, DisplayBuild, Program, Surface, VertexBuffer};
+use glium::backend::glutin_backend::{GlutinFacade, WinRef};
+use glium::glutin;
+use glium::glutin::{Api, ElementState, Event, GlRequest, VirtualKeyCode, Window, WindowBuilder};
+use glium::index::{NoIndices, PrimitiveType};
+use glium::uniforms::{EmptyUniforms, Sampler};
+use glium::texture::texture2d::{Texture2d};
+
 use notify::{RecommendedWatcher, Watcher};
 use time::SteadyTime;
 
 use config::{Config, MidiConfig};
 use error::CustomError;
 use midi::{CcKey, DeviceId, MidiInputs};
-use shaders::{Program, Shader};
 
 type UniformLoc = i32;
 type CcLocMap = HashMap<CcKey, UniformLoc>;
-
-static VERTICES: [GLfloat; 12] = [
-    -1.0, -1.0, 0.0,
-     1.0, -1.0, 0.0,
-     1.0,  1.0, 0.0,
-    -1.0,  1.0, 0.0
-];
 
 static VERTEX_SHADER_SRC: &'static str = include_str!("glsl/default.vert");
 
 static U_RESOLUTION: &'static str = "u_resolution";
 static U_TIME: &'static str = "u_time";
+
+#[derive(Copy,Clone)]
+struct Vertex {
+    position: [f32; 2]
+}
+
+impl Vertex {
+    fn new(x: f32, y: f32) -> Vertex {
+        Vertex { position: [x, y] }
+    }
+}
+
+implement_vertex!(Vertex, position);
 
 pub fn str_ptr(s: &str) -> *const u8 {
     CString::new(s).unwrap().as_ptr()
@@ -60,13 +75,15 @@ pub fn str_ptr(s: &str) -> *const u8 {
 pub struct Varjokuuntelu {
     config: Config,
     fragment_shader_path: String,
-    window: Window,
+    facade: GlutinFacade,
+    vbuf: VertexBuffer<Vertex>,
+    ixs: NoIndices,
     program: RefCell<Program>,
-    fs_resolution_loc: Cell<UniformLoc>,
-    fs_time_loc: Cell<UniformLoc>,
+    //fs_resolution_loc: Cell<UniformLoc>,
+    //fs_time_loc: Cell<UniformLoc>,
     midi_inputs: RefCell<MidiInputs>,
-    midi_locs: RefCell<CcLocMap>,
-    midi_state: RefCell<HashMap<UniformLoc, GLfloat>>
+    //midi_locs: RefCell<CcLocMap>,
+    midi_state: RefCell<HashMap<UniformLoc, f32>>
 }
 
 impl Varjokuuntelu {
@@ -81,8 +98,9 @@ impl Varjokuuntelu {
             None => Default::default()
         };
                 
-        let window = try!(init_window(dimensions_opt, fullscreen_monitor_opt));
-        
+        let facade = try!(init_display(dimensions_opt, fullscreen_monitor_opt));
+
+        /*
         // Set up Vertex Array Object and Vertex Buffer Object
         let mut vao = 0;
         let mut vbo = 0;
@@ -102,10 +120,18 @@ impl Varjokuuntelu {
                 gl::STATIC_DRAW
             );
         }
+        */
+
+        let vbuf = try!(VertexBuffer::new(&facade, &vec![
+            Vertex::new(-1.0, -1.0), Vertex::new( 1.0, -1.0),
+            Vertex::new( 1.0,  1.0), Vertex::new(-1.0,  1.0)
+        ]));
+
+        let ixs = NoIndices(PrimitiveType::TriangleFan);
         
         print!("Loading {}... ", fs_path);
-        let (program, fs_resolution_loc, fs_time_loc, midi_locs) =
-            try!(match load_fragment_shader_raw(&config.midi, &fs_path) {
+        let program =
+            try!(match load_fragment_shader_raw(&facade, &config.midi, &fs_path) {
                 Ok(result) => {
                     println!("ok");
                     Ok(result)
@@ -125,16 +151,19 @@ impl Varjokuuntelu {
         Ok(Varjokuuntelu {
             config: config,
             fragment_shader_path: fs_path,
-            window: window,
+            facade: facade,
+            vbuf: vbuf,
+            ixs: ixs,
             program: RefCell::new(program),
-            fs_resolution_loc: Cell::new(fs_resolution_loc),
-            fs_time_loc: Cell::new(fs_time_loc),
+            //fs_resolution_loc: Cell::new(fs_resolution_loc),
+            //fs_time_loc: Cell::new(fs_time_loc),
             midi_inputs: RefCell::new(midi_inputs),
-            midi_locs: RefCell::new(midi_locs),
+            //midi_locs: RefCell::new(midi_locs),
             midi_state: RefCell::new(HashMap::new())
         })
     }
-    
+
+    /*
     fn enable_program(&self) {
         let program = self.program.borrow();
 
@@ -156,35 +185,38 @@ impl Varjokuuntelu {
             );
         };
     }
+    */
             
     fn load_fragment_shader(&self) -> Result<(), Box<Error>> {
-        let (program, fs_resolution_loc, fs_time_loc, midi_locs) =
-            try!(load_fragment_shader_raw(&self.config.midi, &self.fragment_shader_path));
+        let program =
+            try!(load_fragment_shader_raw(&self.facade, &self.config.midi, &self.fragment_shader_path));
         *self.program.borrow_mut() = program;
+
+        /*
         self.enable_program();
-        
+
         self.fs_resolution_loc.set(fs_resolution_loc);
         self.fs_time_loc.set(fs_time_loc);
         {
             let mut self_midi_locs = self.midi_locs.borrow_mut();
             *self_midi_locs = midi_locs;
         }
+        */
         
         Ok(())
     }
     
-    fn handle_window_events(&self) -> bool {
+    fn handle_window_events(&self, window: &Window) -> bool {
         let mut end = false;
-        for event in self.window.poll_events() {
+               
+        for event in window.poll_events() {
             match event {
-                Closed =>
-                    { end = true; },
-                KeyboardInput(Pressed, _, Some(Escape)) =>
-                    { end = true; },
-                _ =>
-                    ()
+                Event::Closed => { end = true; },
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Escape)) => { end = true; },
+                _ => {}
             };
         }
+        
         end
     }
     
@@ -200,21 +232,43 @@ impl Varjokuuntelu {
             }
         };
         
+        /*
         let midi_locs = self.midi_locs.borrow();
         let mut midi_state = self.midi_state.borrow_mut();
         for event in midi_events.into_iter() {
             if let Some(&loc) = midi_locs.get(&event.key) {
-                midi_state.insert(loc, event.value as GLfloat);
+                midi_state.insert(loc, event.value as f32);
             }
         }
+        */
     }
     
-    fn render(&self, time: GLfloat) {
-        let (width, height) = match self.window.get_inner_size() {
-            Some(res) => res,
-            None      => (0, 0)
-        };
-        
+    fn render(&self, time: f32) {
+        if let Some(window) = self.facade.get_window() {
+            let (width, height): (u32, u32) = match window.get_inner_size() {
+                Some(res) => res,
+                None      => (0, 0)
+            };
+            
+            let unis = uniform! {
+                u_resolution: [width as f32, height as f32],
+                u_time: time
+            };
+            
+            let mut target = self.facade.draw();
+            target.clear_color(0.0, 0.0, 0.0, 1.0);
+            
+            if let Err(e) = target.draw(&self.vbuf, &self.ixs, &self.program.borrow(), &unis, &Default::default()) {
+                println!("Failed to render: {}", e);
+            }
+
+            if let Err(e) = target.finish() {
+                println!("Failed to finish target: {}", e);
+            }
+        }
+            
+
+        /*
         unsafe {
             // Pass resolution & time uniforms to shader
             gl::Uniform2f(
@@ -247,6 +301,7 @@ impl Varjokuuntelu {
             // Draw
             gl::DrawArrays(gl::TRIANGLE_FAN, 0, (VERTICES.len()) as i32);
         };
+        */
     }
     
     pub fn run(&self) {
@@ -265,35 +320,39 @@ impl Varjokuuntelu {
             }
         }
         
-        self.enable_program();
         let start_time = SteadyTime::now();
 
-        loop {
-            let end = self.handle_window_events();
-            if end {
-                break;
-            }
-            
-            match rx.try_recv() {
-                Ok(_) => {
-                    print!("Reloading {}... ", self.fragment_shader_path);
-                    match self.load_fragment_shader() {
-                        Ok(_) => println!("ok"),
-                        Err(e) => println!("failed\n{}", e.description()),
-                    }
-                },
+        match self.facade.get_window() {
+            Some(window) => loop {
+                let end = self.handle_window_events(&window);
+                if end {
+                    break;
+                }
+                
+                match rx.try_recv() {
+                    Ok(_) => {
+                        print!("Reloading {}... ", self.fragment_shader_path);
+                        match self.load_fragment_shader() {
+                            Ok(_) => println!("ok"),
+                            Err(e) => println!("failed\n{}", e.description()),
+                        }
+                    },
                     
-                Err(_) => ()
-            };
+                    Err(_) => ()
+                };
 
 
-            let time = {
-                let diff = SteadyTime::now() - start_time;
-                0.001 * diff.num_milliseconds() as GLfloat
-            };
-            self.render(time);
-        
-            let _ = self.window.swap_buffers();
+                let time = {
+                    let diff = SteadyTime::now() - start_time;
+                    0.001 * diff.num_milliseconds() as f32
+                };
+                self.render(time);
+                
+                let _ = window.swap_buffers();
+            },
+            None => {
+                println!("Failed to get window");
+            }
         }
 
         match self.midi_inputs.borrow_mut().close() {
@@ -305,18 +364,17 @@ impl Varjokuuntelu {
     }
 }
 
-fn init_window(
+fn init_display(
     dimensions_opt: Option<(u32, u32)>,
     fullscreen_monitor_ix_opt: Option<usize>
-) -> Result<Window, Box<Error>> {
+) -> Result<GlutinFacade, Box<Error>> {
     // Construct a window
     let mut wb = WindowBuilder::new()
         .with_title("varjokuuntelija".to_string())
         .with_vsync()
-        .with_gl(glutin::GlRequest::Specific(Api::OpenGlEs, (2, 0)))
+        .with_gl(GlRequest::Specific(Api::OpenGlEs, (2, 0)))
         //.with_gl_profile(glutin::GlProfile::Core)
-        .with_srgb(Some(true))
-        ;
+        .with_srgb(Some(true));
 
     // Add dimensions if specified
     if let Some((width, height)) = dimensions_opt {
@@ -351,26 +409,28 @@ fn init_window(
         wb = wb.with_fullscreen(fullscreen_monitor);
     }
     
-    let window = try!(wb.build_strict());
-    let _ = unsafe { window.make_current() };
+    let facade = try!(wb.build_glium());
+    
+    //let _ = unsafe { window.make_current() };
 
     // Initialize GL
-    gl::load_with(
+    /*gl::load_with(
         |symbol| window.get_proc_address(symbol) as *const raw::c_void
-    );
+    );*/
     
-    Ok(window)
+    Ok(facade)
 }
 
-fn gl_version() -> (GLint, GLint) {
-    let mut major: GLint = -1;
+fn gl_version() -> (i32, i32) {
+    /*let mut major: GLint = -1;
     unsafe { gl::GetIntegerv(gl::MAJOR_VERSION, &mut major) };
     let mut minor: GLint = -1;
     unsafe { gl::GetIntegerv(gl::MINOR_VERSION, &mut minor) };
-    (major, minor)
+    (major, minor)*/
+    (-666, -666)
 }
 
-fn get_fragment_shader(path: &str) -> Result<Shader, Box<Error>> {
+fn get_fragment_shader(path: &str) -> Result<String, Box<Error>> {
     let fragment_shader_src = {
         let mut file = try!(
             File::open(path)
@@ -386,13 +446,11 @@ fn get_fragment_shader(path: &str) -> Result<Shader, Box<Error>> {
         src
     };
 
-    Shader::new(&fragment_shader_src, gl::FRAGMENT_SHADER)
+    Ok(fragment_shader_src)
 }
 
-fn load_fragment_shader_raw(midi_config: &MidiConfig, path: &str) -> Result<(Program, UniformLoc, UniformLoc, CcLocMap), Box<Error>> {
-    let vertex_shader = try!(Shader::new(VERTEX_SHADER_SRC, gl::VERTEX_SHADER));
-    
-    let fragment_shader = try!(get_fragment_shader(path));
+fn load_fragment_shader_raw(facade: &GlutinFacade, midi_config: &MidiConfig, path: &str) -> Result<Program, Box<Error>> {;
+    let fragment_shader_src = try!(get_fragment_shader(path));
     
     let midi_mappings = {
         let mut mappings = Vec::new();
@@ -419,16 +477,12 @@ fn load_fragment_shader_raw(midi_config: &MidiConfig, path: &str) -> Result<(Pro
         uniforms
     };
     
-    let program = Program::new(
-        vertex_shader,
-        fragment_shader,
-        &uniforms
-    );
+    let program = try!(Program::from_source(facade, VERTEX_SHADER_SRC, &fragment_shader_src, None));
     
-    let fs_resolution_loc = try!(program.get_fragment_uniform(U_RESOLUTION));
-    let fs_time_loc = try!(program.get_fragment_uniform(U_TIME));
+    //let fs_resolution_loc = try!(program.get_fragment_uniform(U_RESOLUTION));
+    //let fs_time_loc = try!(program.get_fragment_uniform(U_TIME));
     
-    let midi_locs = {
+    /*let midi_locs = {
         let mut locs = HashMap::new();
         
         for (key, uniform) in midi_mappings {
@@ -439,7 +493,7 @@ fn load_fragment_shader_raw(midi_config: &MidiConfig, path: &str) -> Result<(Pro
         }
         
         locs
-    };    
+    };*/
 
-    Ok((program, fs_resolution_loc, fs_time_loc, midi_locs))
+    Ok(program)
 }
