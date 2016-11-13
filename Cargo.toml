@@ -13,8 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 getopts = "0.2"
-gl = "0.5"
-glutin = "0.4"
+gl = "0.6"
+glutin = "0.7"
 notify = "2.5"
 portmidi = "0.1"
 rustc-serialize = "0.3"

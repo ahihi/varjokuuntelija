@@ -1,11 +1,10 @@
-#version 150
+precision mediump float;
 
 uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_midi_red;
 uniform float u_midi_green;
 uniform float u_midi_blue;
-out vec4 out_color;
 
 #define TAU 6.283185307179586
 
@@ -71,5 +70,5 @@ void main() {
         0.25, rotate(u_time, p)
     );
     
-    out_color = circles;
+    gl_FragColor = circles;
 }

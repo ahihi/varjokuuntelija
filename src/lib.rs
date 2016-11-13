@@ -24,6 +24,7 @@ use std::os::raw;
 use std::sync::mpsc::channel;
 
 use gl::types::*;
+use glutin::Api;
 use glutin::ElementState::*;
 use glutin::Event::*;
 use glutin::VirtualKeyCode::*;
@@ -52,7 +53,7 @@ static VERTEX_SHADER_SRC: &'static str = include_str!("glsl/default.vert");
 static U_RESOLUTION: &'static str = "u_resolution";
 static U_TIME: &'static str = "u_time";
 
-pub fn str_ptr(s: &str) -> *const i8 {
+pub fn str_ptr(s: &str) -> *const u8 {
     CString::new(s).unwrap().as_ptr()
 }
 
@@ -79,7 +80,7 @@ impl Varjokuuntelu {
             Some(c) => c,
             None => Default::default()
         };
-        
+                
         let window = try!(init_window(dimensions_opt, fullscreen_monitor_opt));
         
         // Set up Vertex Array Object and Vertex Buffer Object
@@ -193,7 +194,7 @@ impl Varjokuuntelu {
             match midi_inputs.read_cc() {
                 Ok(cc) => cc,
                 Err(_) => {
-                    println!("Warning: Failed to read MIDI events");
+                    //println!("Warning: Failed to read MIDI events");
                     Vec::new()
                 }
             }
@@ -257,7 +258,12 @@ impl Varjokuuntelu {
         let mut watcher: RecommendedWatcher = Watcher::new(tx).unwrap();
         watcher.watch(&self.fragment_shader_path).unwrap();
         
-        self.midi_inputs.borrow_mut().open().unwrap();
+        match self.midi_inputs.borrow_mut().open() {
+            Ok(()) => {},
+            Err(e) => {
+                println!("Failed to open MIDI inputs: {}", e.description());
+            }
+        }
         
         self.enable_program();
         let start_time = SteadyTime::now();
@@ -289,8 +295,13 @@ impl Varjokuuntelu {
         
             let _ = self.window.swap_buffers();
         }
-        
-        self.midi_inputs.borrow_mut().close().unwrap();
+
+        match self.midi_inputs.borrow_mut().close() {
+            Ok(()) => {},
+            Err(e) => {
+                println!("Failed to close MIDI inputs: {}", e.description());
+            }
+        }
     }
 }
 
@@ -302,8 +313,8 @@ fn init_window(
     let mut wb = WindowBuilder::new()
         .with_title("varjokuuntelija".to_string())
         .with_vsync()
-        .with_gl(glutin::GlRequest::Latest)
-        .with_gl_profile(glutin::GlProfile::Core)
+        .with_gl(glutin::GlRequest::Specific(Api::OpenGlEs, (2, 0)))
+        //.with_gl_profile(glutin::GlProfile::Core)
         .with_srgb(Some(true))
         ;
 
