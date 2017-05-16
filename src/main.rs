@@ -8,7 +8,6 @@ use varjokuuntelu::Varjokuuntelu;
 use varjokuuntelu::midi::MidiInputs;
 
 fn main() {
-    MidiInputs::initialize().unwrap();
     let args: Vec<String> = env::args().collect();
     
     let exit_code = match Varjokuuntelu::new(&args) {
@@ -21,6 +20,5 @@ fn main() {
             1
         }
     };
-    MidiInputs::terminate().unwrap();
     process::exit(exit_code);
 }

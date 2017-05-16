@@ -13,9 +13,9 @@ path = "src/main.rs"
 
 [dependencies]
 getopts = "0.2"
-glium = "0.15"
-glutin = "0.7"
-notify = "2.5"
-portmidi = "0.1"
+glium = "0.16"
+glutin = "0.8"
+notify = "4.0"
+portmidi = "0.2"
 rustc-serialize = "0.3"
 time = "0.1"

@@ -3,11 +3,10 @@ use std::collections::HashMap;
 use std::error::Error;
 
 use ::pm;
-use ::pm::{InputPort, PortMidiDeviceId};
 
 use error::CustomError;
 
-pub type DeviceId = PortMidiDeviceId;
+pub type DeviceId = pm::PortMidiDeviceId;
 pub type Channel = u8;
 pub type Cc = u8;
 pub type Value = u8;
@@ -15,7 +14,7 @@ pub type Value = u8;
 //pub type ChannelCcMap = HashMap<Channel, Cc>;
 //pub type DeviceChannelMap = HashMap<DeviceId, ChannelCcMap>;
 
-static INPUT_BUFFER_SIZE: i32 = 1024;
+static INPUT_BUFFER_SIZE: usize = 1024;
 static STATUS_NIBBLE_CC: u8 = 0b1011;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -32,49 +31,32 @@ pub struct CcEvent {
 }
 
 pub struct MidiInputs {
-    inputs: HashMap<DeviceId, InputPort>
+    portmidi: pm::PortMidi,
+    inputs: HashMap<DeviceId, pm::InputPort>
 }
 
 impl MidiInputs {
-    pub fn initialize() -> Result<(), Box<Error>> {
-        Ok(try!(pm::initialize()))
-    }
-    
-    pub fn terminate() -> Result<(), Box<Error>> {
-        Ok(try!(pm::terminate()))
-    }
-    
     pub fn new(device_ids: &[DeviceId]) -> Result<MidiInputs, Box<Error>> {
+        let portmidi = try!(pm::PortMidi::new());
+        
         let mut inputs = HashMap::new();
         
         for &id in device_ids {
             let device_info = try!(
-                pm::get_device_info(id)
-                    .ok_or(CustomError::new(
+                portmidi.device(id)
+                    /*.ok_or(CustomError::new(
                         &format!("Invalid device id: {}", id)
-                    ))
+                    ))*/
             );
             println!("{:?}", device_info);
-            inputs.insert(id, InputPort::new(id, INPUT_BUFFER_SIZE));
+            let input_port = try!(portmidi.input_port(device_info, INPUT_BUFFER_SIZE));
+            inputs.insert(id, input_port);
         }
                 
         Ok(MidiInputs {
+            portmidi: portmidi,
             inputs: inputs
         })
-    }
-
-    pub fn open(&mut self) -> Result<(), Box<Error>> {
-        for (_, ref mut input) in self.inputs.iter_mut() {
-            try!(input.open());
-        }
-        Ok(())
-    }
-    
-    pub fn close(&mut self) -> Result<(), Box<Error>> {
-        for (_, ref mut input) in self.inputs.iter_mut() {
-            try!(input.close());
-        }
-        Ok(())
     }
 
     pub fn read_cc(&mut self) -> Result<Vec<CcEvent>, Box<Error>> {

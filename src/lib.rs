@@ -22,26 +22,19 @@ use std::mem;
 use std::ptr;
 use std::os::raw;
 use std::sync::mpsc::channel;
-
-/*
-use glutin::Api;
-use glutin::ElementState::*;
-use glutin::Event::*;
-use glutin::VirtualKeyCode::*;
-use glutin::Window;
-use glutin::WindowBuilder;
- */
+use std::time::{Duration};
 
 use glium::{Display, DisplayBuild, Program, Surface, VertexBuffer};
 use glium::backend::glutin_backend::{GlutinFacade, WinRef};
 use glium::glutin;
 use glium::glutin::{Api, ElementState, Event, GlRequest, VirtualKeyCode, Window, WindowBuilder};
 use glium::index::{NoIndices, PrimitiveType};
+use glium::program::{ProgramCreationError};
 use glium::uniforms::{EmptyUniforms, Sampler};
 use glium::texture::texture2d::{Texture2d};
 
-use notify::{RecommendedWatcher, Watcher};
-use time::SteadyTime;
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use time::{SteadyTime};
 
 use config::{Config, MidiConfig};
 use error::CustomError;
@@ -67,10 +60,6 @@ impl Vertex {
 }
 
 implement_vertex!(Vertex, position);
-
-pub fn str_ptr(s: &str) -> *const u8 {
-    CString::new(s).unwrap().as_ptr()
-}
 
 pub struct Varjokuuntelu {
     config: Config,
@@ -310,16 +299,9 @@ impl Varjokuuntelu {
         
         let (tx, rx) = channel();
         
-        let mut watcher: RecommendedWatcher = Watcher::new(tx).unwrap();
-        watcher.watch(&self.fragment_shader_path).unwrap();
-        
-        match self.midi_inputs.borrow_mut().open() {
-            Ok(()) => {},
-            Err(e) => {
-                println!("Failed to open MIDI inputs: {}", e.description());
-            }
-        }
-        
+        let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_millis(0)).unwrap();
+        watcher.watch(&self.fragment_shader_path, RecursiveMode::NonRecursive).unwrap();
+                
         let start_time = SteadyTime::now();
 
         match self.facade.get_window() {
@@ -354,13 +336,6 @@ impl Varjokuuntelu {
                 println!("Failed to get window");
             }
         }
-
-        match self.midi_inputs.borrow_mut().close() {
-            Ok(()) => {},
-            Err(e) => {
-                println!("Failed to close MIDI inputs: {}", e.description());
-            }
-        }
     }
 }
 
@@ -372,8 +347,9 @@ fn init_display(
     let mut wb = WindowBuilder::new()
         .with_title("varjokuuntelija".to_string())
         .with_vsync()
-        .with_gl(GlRequest::Specific(Api::OpenGlEs, (2, 0)))
+        //.with_gl(GlRequest::Specific(Api::OpenGlEs, (2, 0)))
         //.with_gl_profile(glutin::GlProfile::Core)
+        .with_gl(GlRequest::Latest)
         .with_srgb(Some(true));
 
     // Add dimensions if specified
@@ -449,7 +425,7 @@ fn get_fragment_shader(path: &str) -> Result<String, Box<Error>> {
     Ok(fragment_shader_src)
 }
 
-fn load_fragment_shader_raw(facade: &GlutinFacade, midi_config: &MidiConfig, path: &str) -> Result<Program, Box<Error>> {;
+fn load_fragment_shader_raw(facade: &GlutinFacade, midi_config: &MidiConfig, path: &str) -> Result<Program, Box<Error>> {
     let fragment_shader_src = try!(get_fragment_shader(path));
     
     let midi_mappings = {
@@ -476,8 +452,14 @@ fn load_fragment_shader_raw(facade: &GlutinFacade, midi_config: &MidiConfig, pat
         
         uniforms
     };
-    
-    let program = try!(Program::from_source(facade, VERTEX_SHADER_SRC, &fragment_shader_src, None));
+
+    let program_result = Program::from_source(facade, VERTEX_SHADER_SRC, &fragment_shader_src, None);
+
+    if let Err(ProgramCreationError::CompilationError(e)) = program_result {
+        return Err(Box::new(CustomError::new(&e)));
+    }
+
+    let program = try!(program_result);
     
     //let fs_resolution_loc = try!(program.get_fragment_uniform(U_RESOLUTION));
     //let fs_time_loc = try!(program.get_fragment_uniform(U_TIME));
