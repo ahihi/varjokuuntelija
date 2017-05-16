@@ -301,7 +301,7 @@ impl Varjokuuntelu {
         
         let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_millis(0)).unwrap();
         watcher.watch(&self.fragment_shader_path, RecursiveMode::NonRecursive).unwrap();
-                
+        
         let start_time = SteadyTime::now();
 
         match self.facade.get_window() {
@@ -330,7 +330,7 @@ impl Varjokuuntelu {
                 };
                 self.render(time);
                 
-                let _ = window.swap_buffers();
+                //window.swap_buffers().unwrap();
             },
             None => {
                 println!("Failed to get window");
