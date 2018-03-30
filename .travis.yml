@@ -17,6 +17,7 @@ addons:
     - libportmidi-dev
 
 script:
+  - cargo build --verbose --release
   # This command generates a release.zip file.
   - make dist
 
