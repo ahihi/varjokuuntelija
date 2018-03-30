@@ -18,6 +18,9 @@ script:
   # This command generates a release.zip file.
   - make dist
 
+before_deploy:
+  - git fetch --tags
+
 deploy:
   provider: releases
   api_key:
