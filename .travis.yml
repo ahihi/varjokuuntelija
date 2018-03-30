@@ -8,9 +8,6 @@ rust:
 matrix:
   allow_failures:
 
-env:
-
-
 addons:
   apt:
     packages:
