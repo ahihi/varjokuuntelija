@@ -1,6 +1,14 @@
+sudo: false
+
 language: rust
+
 rust:
-  - 1.7.0
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq libportmidi-dev
+    - stable
+
+matrix:
+  allow_failures:
+
+addons:
+  apt:
+    packages:
+    - libportmidi-dev
