@@ -175,13 +175,13 @@ impl Varjokuuntelu {
             }
         };
         
-        let midi_locs = self.midi_locs.borrow();
+        /*let midi_locs = self.midi_locs.borrow();
         let mut midi_state = self.midi_state.borrow_mut();
         for event in midi_events.into_iter() {
             if let Some(&loc) = midi_locs.get(&event.key) {
                 midi_state.insert(loc, event.value as f32);
             }
-        }
+        }*/
     }
     
     fn render(&self, time: f32) {
