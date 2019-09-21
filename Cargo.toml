@@ -1,7 +1,7 @@
 [package]
 name = "varjokuuntelija"
 version = "0.1.0"
-authors = ["Miranda Kastemaa <miranda@foldplop.com>"]
+authors = ["miranda kastemaa <miranda@foldplop.com>"]
 
 [lib]
 name = "varjokuuntelu"
@@ -13,8 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 getopts = "0.2"
-glium = "0.16"
-glutin = "0.8"
+glium = "0.25"
+glutin = "0.21"
 notify = "4.0"
 portmidi = "0.2"
 rustc-serialize = "0.3"

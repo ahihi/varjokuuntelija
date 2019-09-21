@@ -11,7 +11,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     
     let exit_code = match Varjokuuntelu::new(&args) {
-        Ok(vk) => {
+        Ok(mut vk) => {
             vk.run();
             0
         },
